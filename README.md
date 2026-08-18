@@ -44,6 +44,27 @@ module "example" {
 
 ## Modules
 
-| Module | Status |
-|---|---|
-| `s3-bucket` | in development |
+| Module | Latest tag | Docs |
+|---|---|---|
+| `s3-bucket` | `s3-bucket/v1.0.0` | [modules/s3-bucket](modules/s3-bucket/README.md) |
+
+## Validating a change
+
+`examples/validate` exercises every `s3-bucket` profile and each dynamic block, so a
+shape error surfaces here rather than in a consumer repo. It is never applied against
+a real account:
+
+```bash
+cd examples/validate
+terraform init -backend=false
+terraform validate
+```
+
+To plan it (still no real account — the provider is mocked), isolate it from any
+ambient AWS profile:
+
+```bash
+AWS_PROFILE= AWS_ACCESS_KEY_ID=mock AWS_SECRET_ACCESS_KEY=mock AWS_REGION=us-east-1 \
+AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null \
+terraform plan
+```
