@@ -53,7 +53,7 @@ Every profile emits:
 - versioning enabled
 - a server-side encryption configuration — never absent
 - `object_ownership = "BucketOwnerEnforced"` (ACLs disabled)
-- server access logging, unless `enable_logging = false`
+- server access logging, unless `enable_logging = false` — but see the warning below
 - standard tags, with **no** `ignore_changes = [tags]`
 - a `DenyInsecureTransport` policy statement covering **both** the bucket and
   object ARN
@@ -61,6 +61,41 @@ Every profile emits:
 That last one is the defect this module was built to eliminate. A statement scoped
 only to `"${arn}/*"` covers objects but leaves `ListBucket`, `GetBucketPolicy`, and
 `GetBucketLocation` reachable over plaintext HTTP.
+
+## Logging: configuring the source is not enough
+
+**This module can only configure the *source* bucket.** Delivery also requires a grant on
+the *target* bucket, which is a different bucket and therefore the caller's job:
+
+```hcl
+# On the TARGET bucket's policy:
+statement {
+  sid       = "S3ServerAccessLogsPolicy"
+  effect    = "Allow"
+  actions   = ["s3:PutObject"]
+  resources = ["${module.logs.arn}/*"]
+  principals {
+    type        = "Service"
+    identifiers = ["logging.s3.amazonaws.com"]
+  }
+  condition {
+    test     = "StringEquals"
+    variable = "aws:SourceAccount"
+    values   = [var.account_id]
+  }
+}
+```
+
+Without it, `aws_s3_bucket_logging` is accepted, `terraform apply` succeeds, and **no logs
+are ever written**. S3 access-log delivery is best-effort, so nothing errors and nothing
+warns.
+
+A consumer discovered this the expensive way: 19 buckets had logging configured for a long
+time and the target bucket contained zero access-log objects. The legacy alternative — a
+`LogDelivery` group **`WRITE`** grant on the target's ACL — is incompatible with
+`BucketOwnerEnforced` anyway, so the policy statement is the only forward path.
+
+Verify by listing the target bucket a few hours after apply, not by reading the plan.
 
 ## Tag charset is validated at plan time
 
