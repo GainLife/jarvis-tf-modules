@@ -5,7 +5,7 @@ profile, rather than exposing a boolean per control.
 
 ```hcl
 module "archive" {
-  source = "git::https://github.com/GainLife/jarvis-tf-modules.git//modules/s3-bucket?ref=s3-bucket/v1.0.0"
+  source = "git::https://github.com/GainLife/jarvis-tf-modules.git//modules/s3-bucket?ref=s3-bucket/v1.1.0"
 
   name       = "example-prefix-${var.env}-archive"
   purpose    = "archive"
@@ -61,6 +61,17 @@ Every profile emits:
 That last one is the defect this module was built to eliminate. A statement scoped
 only to `"${arn}/*"` covers objects but leaves `ListBucket`, `GetBucketPolicy`, and
 `GetBucketLocation` reachable over plaintext HTTP.
+
+## Tag charset is validated at plan time
+
+AWS rejects tag keys and values containing anything outside
+`letters digits whitespace _ . : / = + - @` — notably **no parentheses and no
+commas** — with `InvalidTag`. That failure happens at *apply* time, mid-run, after
+earlier resources have already changed; `terraform plan` does not catch it.
+
+`purpose` and every key and value in `tags` are validated against that charset, so
+the failure surfaces at `terraform validate` instead. A consumer PR was lost to this
+exact problem on an `aws_s3_bucket` `Purpose` tag before the check existed.
 
 ## Extending the bucket policy
 

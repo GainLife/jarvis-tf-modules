@@ -16,6 +16,16 @@ variable "purpose" {
     the server-access-log prefix. Example: "archive".
   EOT
   type        = string
+
+  # AWS rejects tag values outside [letters digits whitespace _ . : / = + - @]
+  # with InvalidTag. That failure happens at APPLY time, mid-run, after earlier
+  # resources have already changed — `terraform plan` does not catch it. This
+  # validation moves it to plan time. See the Gotchas section of the consumer
+  # repo's CLAUDE.md; PR #392 died this way on an aws_s3_bucket Purpose tag.
+  validation {
+    condition     = can(regex("^[[:alnum:] _.:/=+@-]+$", var.purpose))
+    error_message = "purpose becomes a tag value, so it may only contain letters, digits, whitespace, and _ . : / = + - @ — no parentheses or commas (AWS rejects them with InvalidTag at apply time)."
+  }
 }
 
 variable "data_class" {
@@ -162,7 +172,24 @@ variable "tags" {
 
     When migrating an existing bucket, pass its current tags here (e.g.
     Category) or the first apply will show them being removed.
+
+    Keys and values are validated against AWS's tag charset, because InvalidTag
+    is an apply-time failure that no plan reveals.
   EOT
   type        = map(string)
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for v in values(var.tags) : can(regex("^[[:alnum:] _.:/=+@-]*$", v))
+    ])
+    error_message = "Tag VALUES may only contain letters, digits, whitespace, and _ . : / = + - @ — no parentheses or commas. AWS rejects the rest with InvalidTag at apply time, mid-run, after earlier resources have already changed."
+  }
+
+  validation {
+    condition = alltrue([
+      for k in keys(var.tags) : can(regex("^[[:alnum:] _.:/=+@-]+$", k))
+    ])
+    error_message = "Tag KEYS may only contain letters, digits, whitespace, and _ . : / = + - @ — no parentheses or commas."
+  }
 }
