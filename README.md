@@ -30,14 +30,14 @@ placeholders instead.
 Tags are path-prefixed per module so each versions independently:
 
 ```
-s3-bucket/v1.1.0
+s3-bucket/v1.2.0
 ```
 
 Consumers pin an exact tag. No floating refs, no branch names:
 
 ```hcl
 module "example" {
-  source = "git::https://github.com/GainLife/jarvis-tf-modules.git//modules/s3-bucket?ref=s3-bucket/v1.1.0"
+  source = "git::https://github.com/GainLife/jarvis-tf-modules.git//modules/s3-bucket?ref=s3-bucket/v1.2.0"
   # ...
 }
 ```
@@ -46,7 +46,7 @@ module "example" {
 
 | Module | Latest tag | Docs |
 |---|---|---|
-| `s3-bucket` | `s3-bucket/v1.1.0` | [modules/s3-bucket](modules/s3-bucket/README.md) |
+| `s3-bucket` | `s3-bucket/v1.2.0` | [modules/s3-bucket](modules/s3-bucket/README.md) |
 
 ## Validating a change
 

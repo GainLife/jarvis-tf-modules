@@ -5,7 +5,7 @@ profile, rather than exposing a boolean per control.
 
 ```hcl
 module "archive" {
-  source = "git::https://github.com/GainLife/jarvis-tf-modules.git//modules/s3-bucket?ref=s3-bucket/v1.1.0"
+  source = "git::https://github.com/GainLife/jarvis-tf-modules.git//modules/s3-bucket?ref=s3-bucket/v1.2.0"
 
   name       = "example-prefix-${var.env}-archive"
   purpose    = "archive"
@@ -141,6 +141,21 @@ that receives uploads.
 **Switching AES256 → CMK is not retroactive.** Existing objects keep the key they
 were written with; only new writes use the CMK. Every principal reading the bucket
 needs `kms:Decrypt` added *first*, or reads break at runtime.
+
+### `phi` has a WRITER-side prerequisite, not just a reader-side one
+
+`phi` forces a CMK, so `s3:x-amz-server-side-encryption` must be `aws:kms` on any
+upload that sends the header at all. A client that explicitly sends `AES256` is
+denied by `DenyUnencryptedObjectUploads`.
+
+This is easy to miss because the usual advice is "add `kms:Decrypt` to readers." The
+readers are the second problem. The first is that **an application hardcoding
+`ServerSideEncryption: 'AES256'` on upload will have every write rejected** the
+moment its bucket moves to a CMK.
+
+Audit the writers before assigning `phi` to an existing bucket. The fix is normally to
+stop sending the header at all and let bucket default encryption apply — which is
+also why this module's deny statement tolerates a missing header (see `policy.tf`).
 
 ## Inputs
 

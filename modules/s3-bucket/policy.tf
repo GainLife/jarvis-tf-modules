@@ -83,6 +83,23 @@ data "aws_iam_policy_document" "this" {
         variable = "s3:x-amz-server-side-encryption"
         values   = [local.sse_algorithm]
       }
+
+      # Both conditions AND together, so this denies only when the header is
+      # PRESENT and wrong.
+      #
+      # Without the Null check this statement also denies requests that send NO
+      # encryption header at all: in IAM a StringNotEquals against an absent
+      # condition key evaluates true, so the Deny fires. That is the classic
+      # pre-2023 "require SSE" policy, and it is now wrong — S3 has applied
+      # default encryption unconditionally since January 2023, so a header-less
+      # PUT stores an encrypted object. Denying it rejects a request whose result
+      # would have been fine, and breaks any client that relies on the bucket
+      # default.
+      condition {
+        test     = "Null"
+        variable = "s3:x-amz-server-side-encryption"
+        values   = ["false"]
+      }
     }
   }
 }
