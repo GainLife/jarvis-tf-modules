@@ -65,6 +65,36 @@ variable "acknowledge_public" {
   default     = false
 }
 
+variable "object_ownership" {
+  description = <<-EOT
+    Object ownership setting. Defaults to BucketOwnerEnforced, which disables ACLs and
+    is the intended end state for every bucket.
+
+    "BucketOwnerPreferred" is a MIGRATION-ONLY escape hatch. AWS rejects
+    PutBucketOwnershipControls with InvalidBucketAclWithObjectOwnership if the bucket
+    still carries ACL grants beyond the owner's own — and `terraform plan` shows that
+    change as a clean update, so the failure lands mid-apply.
+
+    Deleting an aws_s3_bucket_acl resource does NOT clear those grants: that
+    resource's delete is a state-only no-op in the AWS provider. The grants must be
+    overwritten with a private ACL first.
+
+    So a bucket with custom ACL grants migrates in two applies:
+      1. object_ownership = "BucketOwnerPreferred", plus an aws_s3_bucket_acl with
+         acl = "private" in the caller, to overwrite the grants.
+      2. drop both — ownership returns to the BucketOwnerEnforced default.
+
+    A bucket left on BucketOwnerPreferred is NOT finished migrating.
+  EOT
+  type        = string
+  default     = "BucketOwnerEnforced"
+
+  validation {
+    condition     = contains(["BucketOwnerEnforced", "BucketOwnerPreferred"], var.object_ownership)
+    error_message = "object_ownership must be BucketOwnerEnforced (the default) or BucketOwnerPreferred (migration only). ObjectWriter is deliberately not offered."
+  }
+}
+
 variable "enable_logging" {
   description = <<-EOT
     Set false only for a log target bucket itself, which cannot log to itself.

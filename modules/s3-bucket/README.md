@@ -5,7 +5,7 @@ profile, rather than exposing a boolean per control.
 
 ```hcl
 module "archive" {
-  source = "git::https://github.com/GainLife/jarvis-tf-modules.git//modules/s3-bucket?ref=s3-bucket/v1.2.0"
+  source = "git::https://github.com/GainLife/jarvis-tf-modules.git//modules/s3-bucket?ref=s3-bucket/v1.3.0"
 
   name       = "example-prefix-${var.env}-archive"
   purpose    = "archive"
@@ -128,6 +128,41 @@ Moving an existing bucket into this module changes its state addresses, so it ne
    `module.x.aws_s3_bucket_logging.this[0]`.
 3. **`aws_s3_bucket_acl` is not moved, it is destroyed** — `BucketOwnerEnforced`
    disables ACLs. Expect it as a removal in the plan.
+
+### A bucket with custom ACL grants needs TWO applies
+
+This one cost a failed apply on a real workspace, so it is worth stating bluntly.
+
+AWS rejects `PutBucketOwnershipControls` with
+`InvalidBucketAclWithObjectOwnership` when the bucket still carries ACL grants beyond
+the owner's own. `terraform plan` shows the ownership change as a clean update, so the
+failure lands **mid-apply**, after earlier resources have already changed.
+
+And destroying the `aws_s3_bucket_acl` resource does **not** clear those grants — that
+resource's delete is a state-only no-op in the AWS provider. The apply log will happily
+say `Destruction complete after 0s` while the grants remain on the bucket.
+
+So for any bucket whose ACL is an `access_control_policy` with grants (a `LogDelivery`
+grant is the common case):
+
+```hcl
+# Apply 1 — overwrite the grants with a private ACL, ownership stays Preferred.
+module "example" {
+  # ...
+  object_ownership = "BucketOwnerPreferred"
+}
+
+resource "aws_s3_bucket_acl" "example" {
+  bucket = module.example.id
+  acl    = "private"
+}
+
+# Apply 2 — delete both of the above. Ownership returns to the
+# BucketOwnerEnforced default and now succeeds.
+```
+
+A bucket whose ACL is already `acl = "private"` has no extra grants and can migrate in a
+single apply.
 
 Two diffs look alarming but are intended: dropping `ignore_changes = [tags]`
 reconciles tag drift on first apply, and switching to `BucketOwnerEnforced` shows the

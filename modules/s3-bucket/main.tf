@@ -142,10 +142,17 @@ resource "aws_s3_bucket_ownership_controls" "this" {
   bucket = aws_s3_bucket.this.id
 
   rule {
-    # Modern default; disables ACLs entirely. Note the consequence for
-    # migrations: any writer sending an ACL header (x-amz-acl) starts failing at
-    # RUNTIME with AccessControlListNotSupported, which no Terraform plan shows.
-    object_ownership = "BucketOwnerEnforced"
+    # Defaults to BucketOwnerEnforced — the modern default, which disables ACLs.
+    #
+    # Two failure modes neither of which a plan reveals:
+    #   1. AWS rejects this with InvalidBucketAclWithObjectOwnership if the bucket
+    #      still has ACL grants beyond the owner's. Destroying an aws_s3_bucket_acl
+    #      does NOT clear them (its delete is a state-only no-op) — they must be
+    #      overwritten with a private ACL first. See var.object_ownership for the
+    #      two-apply migration.
+    #   2. Once enforced, any writer sending x-amz-acl fails at RUNTIME with
+    #      AccessControlListNotSupported.
+    object_ownership = var.object_ownership
   }
 }
 
