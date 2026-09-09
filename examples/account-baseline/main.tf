@@ -26,10 +26,18 @@ module "baseline_defaults" {
   source = "../../modules/account-baseline"
 }
 
-# The shape for an account that serves a public website bucket: the account-wide block
-# must not override that bucket's own block_public_policy = false.
+# An account with no public objects: turn the account-wide block on.
+module "baseline_block_public" {
+  source = "../../modules/account-baseline"
+
+  manage_s3_account_public_access_block = true
+}
+
+# An account that serves one public bucket: keep the block on and relax the single flag,
+# rather than abandoning all four protections.
 module "baseline_public_bucket_account" {
   source = "../../modules/account-baseline"
 
-  s3_block_public_policy = false
+  manage_s3_account_public_access_block = true
+  s3_block_public_policy                = false
 }
